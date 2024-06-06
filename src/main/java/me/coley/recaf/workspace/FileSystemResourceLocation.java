@@ -73,4 +73,8 @@ public final class FileSystemResourceLocation extends ResourceLocation {
     public String toString() {
         return path.toString();
     }
+
+    public Path getPath() {
+        return path;
+    }
 }

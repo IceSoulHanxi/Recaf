@@ -30,5 +30,8 @@ public class DummyCollector implements IResultSaver {
 	public void copyEntry(String s, String s1, String s2, String s3) {}
 
 	@Override
+	public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content) {}
+
+	@Override
 	public void closeArchive(String s, String s1) {}
 }

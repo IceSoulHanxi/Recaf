@@ -4,14 +4,12 @@ import me.coley.recaf.workspace.Workspace;
 import org.jetbrains.java.decompiler.main.ClassesProcessor;
 import org.jetbrains.java.decompiler.main.DecompilerContext;
 import org.jetbrains.java.decompiler.main.IdentityRenamerFactory;
-import org.jetbrains.java.decompiler.main.extern.IBytecodeProvider;
-import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
-import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
-import org.jetbrains.java.decompiler.main.extern.IResultSaver;
+import org.jetbrains.java.decompiler.main.Init;
+import org.jetbrains.java.decompiler.main.extern.*;
+import org.jetbrains.java.decompiler.main.plugins.PluginContext;
 import org.jetbrains.java.decompiler.modules.renamer.PoolInterceptor;
 import org.jetbrains.java.decompiler.struct.IDecompiledData;
 import org.jetbrains.java.decompiler.struct.StructClass;
-import org.jetbrains.java.decompiler.struct.lazy.LazyLoader;
 import org.jetbrains.java.decompiler.util.TextBuffer;
 
 import java.io.IOException;
@@ -29,6 +27,10 @@ import java.util.Map;
 public class FernFlowerAccessor implements IDecompiledData {
 	private final StructContextDecorator structContext;
 	private final ClassesProcessor classProcessor;
+
+	static {
+		Init.init();
+	}
 
 	/**
 	 * Constructs a FernFlower decompiler instance.
@@ -48,13 +50,19 @@ public class FernFlowerAccessor implements IDecompiledData {
 		if (level != null) {
 			logger.setSeverity(IFernflowerLogger.Severity.valueOf(level.toUpperCase(Locale.ENGLISH)));
 		}
-		structContext = new StructContextDecorator(saver, this, new LazyLoader(provider));
+		structContext = new StructContextDecorator(saver, this, provider);
 		classProcessor = new ClassesProcessor(structContext);
-		int threadCount = 1;
-		DecompilerContext context = new DecompilerContext(
-				properties, threadCount, logger, structContext, classProcessor,
-				new PoolInterceptor(), new IdentityRenamerFactory());
+		DecompilerContext context = new DecompilerContext(properties, logger, structContext, classProcessor, new PoolInterceptor());
 		DecompilerContext.setCurrentContext(context);
+		PluginContext plugins = structContext.getPluginContext(); // TODO: register plugin
+		int pluginCount = plugins.findPlugins();
+		logger.writeMessage("Loaded " + pluginCount + " plugins", IFernflowerLogger.Severity.INFO);
+		plugins.initialize();
+		IVariableNamingFactory renamer = plugins.getVariableRenamer();
+		if (renamer == null) {
+			renamer = new IdentityRenamerFactory();
+		}
+		context.renamerFactory = renamer;
 	}
 
 	/**
@@ -96,12 +104,12 @@ public class FernFlowerAccessor implements IDecompiledData {
 		pool.shutdown();
 		pool.awaitTermination(10, TimeUnit.SECONDS);
 		 */
-		for (StructClass cl : structContext.getClasses().values())
-			try {
-				classProcessor.processClass(cl);
-			} catch (Throwable t) {
-				t.printStackTrace();
-			}
+//		for (StructClass cl : structContext.getOwnClasses())
+//			try {
+//				classProcessor.processClass(cl);
+//			} catch (Throwable t) {
+//				t.printStackTrace();
+//			}
 	}
 
 	/**
@@ -120,7 +128,7 @@ public class FernFlowerAccessor implements IDecompiledData {
 	@Override
 	public String getClassEntryName(StructClass cl, String entryName) {
 		ClassesProcessor.ClassNode node = classProcessor.getMapRootClasses().get(cl.qualifiedName);
-		if (node.type != ClassesProcessor.ClassNode.CLASS_ROOT) {
+		if (node.type != ClassesProcessor.ClassNode.Type.ROOT) {
 			return null;
 		} else {
 			return entryName.substring(0, entryName.lastIndexOf(".class")) + ".java";
@@ -128,13 +136,8 @@ public class FernFlowerAccessor implements IDecompiledData {
 	}
 
 	@Override
-	public boolean processClass(StructClass structClass) {
-		try {
-			classProcessor.processClass(structClass);
-			return true;
-		} catch (IOException e) {
-			return false;
-		}
+	public void processClass(StructClass structClass) throws IOException {
+		classProcessor.processClass(structClass);
 	}
 
 	@Override
@@ -154,14 +157,15 @@ public class FernFlowerAccessor implements IDecompiledData {
 			// Because the ClassesProcessor ignores classes with non-root types.
 			//
 			// Treat standard inner classes as root classes.
-			if (node.type == ClassesProcessor.ClassNode.CLASS_MEMBER)
-				node.type = ClassesProcessor.ClassNode.CLASS_ROOT;
+			if (node.type == ClassesProcessor.ClassNode.Type.MEMBER)
+				node.type = ClassesProcessor.ClassNode.Type.ROOT;
 			// Treat anonymous classes as root classes.
 			// - Apply name so it doesn't output "public class null extends whatever"
-			if (node.type == ClassesProcessor.ClassNode.CLASS_ANONYMOUS) {
-				node.type = ClassesProcessor.ClassNode.CLASS_ROOT;
+			if (node.type == ClassesProcessor.ClassNode.Type.ANONYMOUS) {
+				node.type = ClassesProcessor.ClassNode.Type.ROOT;
 				node.simpleName = name.substring(name.lastIndexOf("/") + 1);
 			}
+			classProcessor.processClass(cl);
 			classProcessor.writeClass(cl, buffer);
 		} catch (Throwable t) {
 			DecompilerContext.getLogger().writeMessage("Class " + name + " couldn't be fully decompiled.", t);

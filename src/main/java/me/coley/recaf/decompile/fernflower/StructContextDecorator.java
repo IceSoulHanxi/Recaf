@@ -2,15 +2,12 @@ package me.coley.recaf.decompile.fernflower;
 
 import me.coley.recaf.workspace.JavaResource;
 import me.coley.recaf.workspace.Workspace;
+import org.jetbrains.java.decompiler.main.extern.IBytecodeProvider;
 import org.jetbrains.java.decompiler.main.extern.IResultSaver;
 import org.jetbrains.java.decompiler.struct.IDecompiledData;
 import org.jetbrains.java.decompiler.struct.StructContext;
-import org.jetbrains.java.decompiler.struct.lazy.LazyLoader;
 
 import java.io.IOException;
-import java.util.Map;
-
-import static me.coley.recaf.util.CollectionUtil.copySet;
 
 /**
  * Decorator for StructContext to support Recaf workspaces.
@@ -26,11 +23,11 @@ public class StructContextDecorator extends StructContext {
 	 * @param data
 	 * 		Data instance, should be an instance of
 	 *        {@link me.coley.recaf.decompile.fernflower.FernFlowerAccessor}.
-	 * @param loader
+	 * @param legacyProvider
 	 * 		LazyLoader to hold links to class resources.
 	 */
-	public StructContextDecorator(IResultSaver saver, IDecompiledData data, LazyLoader loader) {
-		super(saver, data, loader);
+	public StructContextDecorator(IResultSaver saver, IDecompiledData data, IBytecodeProvider legacyProvider) {
+		super(legacyProvider, saver, data);
 	}
 
 	/**
@@ -51,12 +48,6 @@ public class StructContextDecorator extends StructContext {
 	}
 
 	private void addResource(JavaResource resource) throws IOException {
-		// Iterate resource class entries
-		for (Map.Entry<String, byte[]> entry : copySet(resource.getClasses().entrySet())) {
-			String name = entry.getKey();
-			String simpleName = name.substring(name.lastIndexOf('/') + 1);
-			byte[] code = entry.getValue();
-			addData(name, simpleName, code, true);
-		}
+		addSpace(new JavaResourceContextSource(resource), true);
 	}
 }

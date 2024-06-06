@@ -126,10 +126,15 @@
 			<version>${procyon.version}</version>
 		</dependency>
 		<!-- http://files.minecraftforge.net/maven/net/minecraftforge/fernflower/ -->
+<!--		<dependency>-->
+<!--			<groupId>net.minecraftforge</groupId>-->
+<!--			<artifactId>forgeflower</artifactId>-->
+<!--			<version>${ff.version}</version>-->
+<!--		</dependency>-->
 		<dependency>
-			<groupId>net.minecraftforge</groupId>
-			<artifactId>forgeflower</artifactId>
-			<version>${ff.version}</version>
+			<groupId>org.vineflower</groupId>
+			<artifactId>vineflower</artifactId>
+			<version>1.10.1</version>
 		</dependency>
 		<!-- https://mvnrepository.com/artifact/com.google.guava/guava -->
 		<dependency>
